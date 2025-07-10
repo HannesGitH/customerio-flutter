@@ -1,3 +1,4 @@
+import 'package:app_links/app_links.dart';
 import 'package:customer_io/customer_io.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -16,10 +17,15 @@ final FlutterLocalNotificationsPlugin localNotificationsPlugin =
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  final appLinks = AppLinks(); // AppLinks is singleton
+
+  // Subscribe to all events (initial link and further)
+  final sub = appLinks.uriLinkStream.listen((uri) {
+    debugPrint("uri: $uri");
+  });
+
   // Initialize FCM (flutter-fire)
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   /// Update the iOS foreground notification presentation options to allow
   /// heads up notifications.
@@ -41,15 +47,19 @@ void main() async {
     android: initSettingsAndroid,
     iOS: initSettingsIOS,
   );
-  await localNotificationsPlugin.initialize(initSettings,
-      onDidReceiveNotificationResponse:
-          (NotificationResponse notificationResponse) async {
-    // Callback from `flutter_local_notifications` plugin for when a local notification is clicked.
-    // Unfortunately, we are only able to get the payload object for the local push, not anything else such as title or body.
-    CustomerIO.instance.track(
+  await localNotificationsPlugin.initialize(
+    initSettings,
+    onDidReceiveNotificationResponse: (
+      NotificationResponse notificationResponse,
+    ) async {
+      // Callback from `flutter_local_notifications` plugin for when a local notification is clicked.
+      // Unfortunately, we are only able to get the payload object for the local push, not anything else such as title or body.
+      CustomerIO.instance.track(
         name: "local push notification clicked",
-        properties: {"payload": notificationResponse.payload});
-  });
+        properties: {"payload": notificationResponse.payload},
+      );
+    },
+  );
 
   // Load SDK configurations
   await dotenv.load(fileName: ".env");
